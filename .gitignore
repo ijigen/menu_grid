@@ -1,0 +1,9 @@
+.env
+uploads/preview/*
+uploads/thumb/*
+uploads/full/*
+!uploads/preview/.gitkeep
+!uploads/thumb/.gitkeep
+!uploads/full/.gitkeep
+tmp/
+*.exe

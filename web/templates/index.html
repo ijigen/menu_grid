@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>作品目錄</title>
+    <link rel="stylesheet" href="/static/css/style.css?v=4">
+</head>
+<body>
+    <!-- Phase 0: 成年驗證 Gate -->
+    <div id="age-gate" class="gate">
+        <div class="gate-card">
+            <h1>年齡驗證</h1>
+            <p>本網站包含限制級內容，請確認您已年滿 18 歲。</p>
+            <div class="gate-buttons">
+                <button id="age-confirm" class="btn btn-primary">我已年滿 18 歲</button>
+                <button id="age-deny" class="btn btn-secondary">離開</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Phase 0: 密碼驗證 Gate -->
+    <div id="password-gate" class="gate" style="display:none;">
+        <div class="gate-card">
+            <h1>密碼驗證</h1>
+            <p>請輸入密碼以解鎖作品。</p>
+            <form id="password-form">
+                <input type="password" id="password-input" placeholder="請輸入密碼" autocomplete="off">
+                <button type="submit" class="btn btn-primary">解鎖</button>
+            </form>
+            <p id="password-error" class="error" style="display:none;">密碼錯誤，請重試。</p>
+        </div>
+    </div>
+
+    <!-- 作品目錄 -->
+    <div id="gallery" style="display:none;">
+        <header class="gallery-header">
+            <h1>作品目錄</h1>
+            <button id="favorites-toggle" class="favorites-btn" title="收藏清單">
+                <span class="heart-icon">♥</span>
+                <span id="favorites-count" class="favorites-count">0</span>
+            </button>
+        </header>
+
+        <div id="works-grid" class="works-grid">
+            <!-- Works will be rendered here -->
+        </div>
+
+        <!-- 收藏側邊欄 -->
+        <div id="favorites-panel" class="favorites-panel">
+            <div class="favorites-panel-header">
+                <h2>收藏清單</h2>
+                <button id="favorites-close" class="close-btn">&times;</button>
+            </div>
+            <div id="favorites-list" class="favorites-list">
+                <p class="empty-msg">尚無收藏</p>
+            </div>
+        </div>
+        <div id="favorites-overlay" class="favorites-overlay"></div>
+    </div>
+
+    <script src="/static/js/app.js?v=4"></script>
+</body>
+</html>
