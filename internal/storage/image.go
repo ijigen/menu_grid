@@ -4,23 +4,24 @@ import (
 	"bytes"
 	"fmt"
 	"image"
-	"image/jpeg"
+	_ "image/jpeg"
 	_ "image/png"
 	"io"
 	"os"
 	"path/filepath"
 
+	"github.com/chai2010/webp"
 	"github.com/disintegration/imaging"
 	"github.com/google/uuid"
 	_ "golang.org/x/image/webp"
 )
 
 const (
-	ThumbMaxWidth   = 400
+	ThumbMaxWidth  = 400
 	PreviewMaxWidth = 100
-	ThumbQuality    = 85
-	PreviewQuality  = 40
-	FullQuality     = 92
+	ThumbQuality   = 85
+	PreviewQuality = 40
+	FullQuality    = 92
 )
 
 type ImageStorage struct {
@@ -45,28 +46,28 @@ func (s *ImageStorage) SaveWithVariants(r io.Reader) (string, error) {
 		return "", fmt.Errorf("failed to decode image: %w", err)
 	}
 
-	filename := uuid.New().String() + ".jpg"
+	filename := uuid.New().String() + ".webp"
 
 	// Ensure directories exist
 	for _, dir := range []string{"full", "thumb", "preview"} {
 		os.MkdirAll(filepath.Join(s.BaseDir, dir), 0755)
 	}
 
-	// 1. Save full - re-encode as high-quality JPEG
-	if err := saveJPEG(filepath.Join(s.BaseDir, "full", filename), img, FullQuality); err != nil {
+	// 1. Save full - re-encode as high-quality WebP
+	if err := saveWebP(filepath.Join(s.BaseDir, "full", filename), img, FullQuality); err != nil {
 		return "", fmt.Errorf("failed to save full: %w", err)
 	}
 
 	// 2. Generate & save thumb (max 400px width)
 	thumb := imaging.Resize(img, ThumbMaxWidth, 0, imaging.Lanczos)
-	if err := saveJPEG(filepath.Join(s.BaseDir, "thumb", filename), thumb, ThumbQuality); err != nil {
+	if err := saveWebP(filepath.Join(s.BaseDir, "thumb", filename), thumb, ThumbQuality); err != nil {
 		s.DeleteAll(filename)
 		return "", fmt.Errorf("failed to save thumb: %w", err)
 	}
 
 	// 3. Generate & save preview (max 100px width, low quality)
 	preview := imaging.Resize(img, PreviewMaxWidth, 0, imaging.Lanczos)
-	if err := saveJPEG(filepath.Join(s.BaseDir, "preview", filename), preview, PreviewQuality); err != nil {
+	if err := saveWebP(filepath.Join(s.BaseDir, "preview", filename), preview, PreviewQuality); err != nil {
 		s.DeleteAll(filename)
 		return "", fmt.Errorf("failed to save preview: %w", err)
 	}
@@ -104,11 +105,11 @@ func (s *ImageStorage) ReadFile(imageType, filename string) ([]byte, error) {
 	return os.ReadFile(path)
 }
 
-func saveJPEG(path string, img image.Image, quality int) error {
+func saveWebP(path string, img image.Image, quality int) error {
 	f, err := os.Create(path)
 	if err != nil {
 		return err
 	}
 	defer f.Close()
-	return jpeg.Encode(f, img, &jpeg.Options{Quality: quality})
+	return webp.Encode(f, img, &webp.Options{Lossless: false, Quality: float32(quality)})
 }

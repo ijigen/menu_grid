@@ -40,6 +40,7 @@ func main() {
 	authHandler := handler.NewAuthHandler(db, cfg.JWTSecret, cfg.AdminPassword, enc)
 	apiHandler := handler.NewAPIHandler(db, store, enc)
 	adminHandler := handler.NewAdminHandler(db, store, enc)
+	fallbackHandler := handler.NewFallbackHandler(db)
 
 	// Router
 	r := chi.NewRouter()
@@ -57,6 +58,9 @@ func main() {
 	fileServer := http.FileServer(http.Dir("./web/static"))
 	r.Handle("/static/*", http.StripPrefix("/static/", fileServer))
 
+	// Service Worker must be served from root for scope
+	r.Get("/sw.js", serveFileWithType("./web/static/js/sw.js", "application/javascript"))
+
 	// Pages
 	r.Get("/", serveFile("./web/templates/index.html"))
 	r.Get("/admin", serveFile("./web/templates/admin.html"))
@@ -69,6 +73,11 @@ func main() {
 		r.Get("/images/preview/{filename}", apiHandler.ServePreviewImage)
 		r.Get("/images/thumb/{filename}", apiHandler.ServeThumbImage)
 		r.Get("/images/full/{filename}", apiHandler.ServeFullImage)
+
+		// Fallback domain (public)
+		r.Get("/fallback/domains", fallbackHandler.GetDomains)
+		r.Post("/fallback/report-failure", fallbackHandler.ReportFailure)
+		r.Post("/fallback/request-replacement", fallbackHandler.RequestReplacement)
 
 		// Admin
 		r.Post("/admin/login", authHandler.AdminLogin)
@@ -87,6 +96,11 @@ func main() {
 			// Plaintext image access for admin panel
 			r.Get("/images/thumb/{filename}", adminHandler.ServeThumbPlain)
 			r.Get("/images/full/{filename}", adminHandler.ServeFullPlain)
+			// Fallback domain management
+			r.Get("/fallback/domains", fallbackHandler.ListFallbackDomains)
+			r.Post("/fallback/domains", fallbackHandler.AddFallbackDomain)
+			r.Put("/fallback/domains/{id}/toggle", fallbackHandler.ToggleFallbackDomain)
+			r.Delete("/fallback/domains/{id}", fallbackHandler.DeleteFallbackDomain)
 		})
 	})
 
@@ -96,6 +110,13 @@ func main() {
 
 func serveFile(path string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, path)
+	}
+}
+
+func serveFileWithType(path, contentType string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", contentType)
 		http.ServeFile(w, r, path)
 	}
 }

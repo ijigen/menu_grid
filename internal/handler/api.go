@@ -77,7 +77,7 @@ func (h *APIHandler) GetWork(w http.ResponseWriter, r *http.Request) {
 // Preview images are low-quality plaintext (no encryption).
 func (h *APIHandler) ServePreviewImage(w http.ResponseWriter, r *http.Request) {
 	filename := chi.URLParam(r, "filename")
-	w.Header().Set("Content-Type", "image/jpeg")
+	w.Header().Set("Content-Type", "image/webp")
 	w.Header().Set("Cache-Control", "public, max-age=86400")
 	if err := h.Storage.ServeImage(w, "preview", filename); err != nil {
 		http.Error(w, "not found", http.StatusNotFound)

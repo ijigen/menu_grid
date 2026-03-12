@@ -62,7 +62,7 @@ async function decryptImage(encryptedBuffer) {
         state.cryptoKey,
         ciphertext
     );
-    return new Blob([decrypted], { type: 'image/jpeg' });
+    return new Blob([decrypted], { type: 'image/webp' });
 }
 
 // Fetch encrypted image, decrypt, return blob URL. Caches results.
@@ -107,10 +107,44 @@ function updateGateState() {
         dom.ageGate.style.display = 'flex';
     } else if (!state.passwordVerified) {
         dom.passwordGate.style.display = 'flex';
+        // Pre-fetch works data + preview images while user types password
+        prefetchPreviews();
     } else {
         dom.gallery.style.display = 'block';
         loadWorks();
     }
+}
+
+// Pre-fetch works list and preview images before password verification.
+// Data is cached in state but NOT rendered until both gates pass.
+async function prefetchPreviews() {
+    if (state.prefetched) return;
+    state.prefetched = true;
+    try {
+        const res = await fetch('/api/works');
+        const works = await res.json();
+        state.works = works;
+        // Pre-fetch all preview images into browser cache
+        const previews = [];
+        for (const work of works) {
+            if (work.images) {
+                for (const img of work.images) {
+                    previews.push(previewUrl(img.filename));
+                }
+            }
+        }
+        // Fetch up to 6 at a time
+        const queue = [...previews];
+        async function worker() {
+            while (queue.length > 0) {
+                const url = queue.shift();
+                try { await fetch(url); } catch {}
+            }
+        }
+        const workers = [];
+        for (let i = 0; i < Math.min(6, previews.length); i++) workers.push(worker());
+        await Promise.all(workers);
+    } catch {}
 }
 
 function onAgeConfirm() {
@@ -150,8 +184,11 @@ async function onPasswordSubmit(e) {
 // ===== Works =====
 async function loadWorks() {
     try {
-        const res = await fetch('/api/works');
-        state.works = await res.json();
+        // Use pre-fetched data if available, otherwise fetch fresh
+        if (!state.works || state.works.length === 0) {
+            const res = await fetch('/api/works');
+            state.works = await res.json();
+        }
         renderWorks();
     } catch {
         dom.worksGrid.innerHTML = '<p style="color:#666;padding:40px;text-align:center;">無法載入作品</p>';
@@ -587,11 +624,98 @@ function escapeHtml(str) {
     return div.innerHTML;
 }
 
-// Phase 3: Service Worker registration placeholder
-// if ('serviceWorker' in navigator) {
-//     navigator.serviceWorker.register('/sw.js');
-// }
+// ===== Phase 3: Service Worker + Fallback Domains =====
+
+// Generate or retrieve a stable client ID for fallback domain assignment
+function getClientId() {
+    let id = localStorage.getItem('client_id');
+    if (!id) {
+        id = crypto.randomUUID ? crypto.randomUUID() : (
+            'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+                const r = Math.random() * 16 | 0;
+                return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+            })
+        );
+        localStorage.setItem('client_id', id);
+    }
+    return id;
+}
+
+// Fetch fallback domains from server and pass to Service Worker
+async function initFallbackDomains() {
+    try {
+        const clientId = getClientId();
+        const res = await fetch(`/api/fallback/domains?client_id=${encodeURIComponent(clientId)}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        const domains = data.domains || [];
+        if (domains.length === 0) return;
+
+        // Store in SW via postMessage
+        if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+            navigator.serviceWorker.controller.postMessage({
+                type: 'store-fallback-domains',
+                domains,
+            });
+        }
+    } catch {
+        // Silently fail — fallback domains are optional
+    }
+}
+
+// Handle SW messages (e.g., failed fallback domain)
+function setupSWMessageHandler() {
+    if (!navigator.serviceWorker) return;
+    navigator.serviceWorker.addEventListener('message', async (event) => {
+        if (event.data.type === 'fallback-domain-failed') {
+            const failedDomain = event.data.domain;
+            const clientId = getClientId();
+
+            // Report failure to server
+            try {
+                await fetch('/api/fallback/report-failure', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ client_id: clientId, domain: failedDomain }),
+                });
+            } catch {}
+
+            // Request replacement
+            try {
+                const res = await fetch('/api/fallback/request-replacement', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ client_id: clientId, failed_domain: failedDomain }),
+                });
+                if (!res.ok) return;
+                const data = await res.json();
+                if (data.domain) {
+                    // Re-fetch updated domain list and update SW
+                    await initFallbackDomains();
+                }
+            } catch {}
+        }
+    });
+}
+
+// Register Service Worker
+async function registerServiceWorker() {
+    if (!('serviceWorker' in navigator)) return;
+    try {
+        await navigator.serviceWorker.register('/sw.js');
+        setupSWMessageHandler();
+        // Wait for SW to activate then send fallback domains
+        if (navigator.serviceWorker.controller) {
+            initFallbackDomains();
+        } else {
+            navigator.serviceWorker.addEventListener('controllerchange', () => {
+                initFallbackDomains();
+            }, { once: true });
+        }
+    } catch {}
+}
 
 // ===== Start =====
 updateFavoritesCount();
 init();
+registerServiceWorker();

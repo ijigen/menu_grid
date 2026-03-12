@@ -63,6 +63,29 @@ document.getElementById('btn-settings').addEventListener('click', () => {
     if (settingsVisible) loadSettings();
 });
 
+// Fallback domain management
+let fallbackVisible = false;
+const fallbackSection = document.getElementById('fallback-section');
+
+document.getElementById('btn-fallback').addEventListener('click', () => {
+    fallbackVisible = !fallbackVisible;
+    fallbackSection.style.display = fallbackVisible ? 'block' : 'none';
+    if (fallbackVisible) loadFallbackDomains();
+});
+
+document.getElementById('btn-add-fallback').addEventListener('click', async () => {
+    const input = document.getElementById('fallback-domain-input');
+    const domain = input.value.trim();
+    if (!domain) return;
+    try {
+        await api('POST', '/api/admin/fallback/domains', { domain });
+        input.value = '';
+        await loadFallbackDomains();
+    } catch (e) {
+        alert('新增失敗（可能重複）');
+    }
+});
+
 document.getElementById('btn-save-password').addEventListener('click', async () => {
     const pw = unlockPasswordInput.value.trim();
     if (!pw) return;
@@ -110,6 +133,8 @@ function renderWorks() {
             : '<span style="color:#ccc;">—</span>';
 
         const tr = document.createElement('tr');
+        tr.draggable = true;
+        tr.dataset.id = work.id;
         tr.innerHTML = `
             <td><span class="sort-handle" title="排序：${work.sort_order}">&#9776;</span></td>
             <td class="thumb-cell">${imgHtml}</td>
@@ -122,6 +147,63 @@ function renderWorks() {
             </td>
         `;
         worksTbody.appendChild(tr);
+    });
+
+    initDragSort();
+}
+
+// ===== Drag & Drop Sort =====
+let dragRow = null;
+
+function initDragSort() {
+    const rows = worksTbody.querySelectorAll('tr');
+    rows.forEach(row => {
+        row.addEventListener('dragstart', (e) => {
+            dragRow = row;
+            row.style.opacity = '0.4';
+            e.dataTransfer.effectAllowed = 'move';
+        });
+        row.addEventListener('dragend', () => {
+            row.style.opacity = '1';
+            dragRow = null;
+            worksTbody.querySelectorAll('tr').forEach(r => r.classList.remove('drag-over'));
+        });
+        row.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            row.classList.add('drag-over');
+        });
+        row.addEventListener('dragleave', () => {
+            row.classList.remove('drag-over');
+        });
+        row.addEventListener('drop', async (e) => {
+            e.preventDefault();
+            row.classList.remove('drag-over');
+            if (!dragRow || dragRow === row) return;
+
+            // Reorder in DOM
+            const allRows = [...worksTbody.querySelectorAll('tr')];
+            const fromIdx = allRows.indexOf(dragRow);
+            const toIdx = allRows.indexOf(row);
+            if (fromIdx < toIdx) {
+                row.after(dragRow);
+            } else {
+                row.before(dragRow);
+            }
+
+            // Build new order and save
+            const reordered = [...worksTbody.querySelectorAll('tr')].map((r, i) => ({
+                id: parseInt(r.dataset.id),
+                sort_order: i,
+            }));
+            try {
+                await api('PUT', '/api/admin/works/reorder', { orders: reordered });
+                await loadWorks();
+            } catch {
+                alert('排序儲存失敗');
+                await loadWorks();
+            }
+        });
     });
 }
 
@@ -286,6 +368,55 @@ async function loadSettings() {
         unlockPasswordInput.placeholder = settings.unlock_password ? '目前已設定（輸入新密碼以覆蓋）' : '輸入密碼';
     } catch {}
 }
+
+// ===== Fallback Domains =====
+async function loadFallbackDomains() {
+    try {
+        const domains = await api('GET', '/api/admin/fallback/domains');
+        renderFallbackDomains(domains);
+    } catch {
+        renderFallbackDomains([]);
+    }
+}
+
+function renderFallbackDomains(domains) {
+    const tbody = document.getElementById('fallback-tbody');
+    const empty = document.getElementById('fallback-empty');
+    tbody.innerHTML = '';
+
+    if (!domains || domains.length === 0) {
+        empty.style.display = 'block';
+        document.getElementById('fallback-table').style.display = 'none';
+        return;
+    }
+    empty.style.display = 'none';
+    document.getElementById('fallback-table').style.display = '';
+
+    domains.forEach(d => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>${escapeHtml(d.domain)}</td>
+            <td>${d.active_assignments || 0}</td>
+            <td><span class="status-badge ${d.is_active ? 'status-published' : 'status-draft'}">${d.is_active ? '啟用' : '停用'}</span></td>
+            <td>
+                <button class="btn btn-outline" onclick="toggleFallbackDomain(${d.id})">${d.is_active ? '停用' : '啟用'}</button>
+                <button class="btn btn-danger" onclick="deleteFallbackDomain(${d.id})">刪除</button>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+window.toggleFallbackDomain = async function(id) {
+    await api('PUT', `/api/admin/fallback/domains/${id}/toggle`);
+    await loadFallbackDomains();
+};
+
+window.deleteFallbackDomain = async function(id) {
+    if (!confirm('確定要刪除此備援域名？')) return;
+    await api('DELETE', `/api/admin/fallback/domains/${id}`);
+    await loadFallbackDomains();
+};
 
 // ===== API Helper =====
 async function api(method, url, body = null) {

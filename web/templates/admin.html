@@ -42,6 +42,8 @@
         .status-published { background: #d4edda; color: #155724; }
         .status-draft { background: #f0f0f0; color: #999; }
         .sort-handle { cursor: grab; color: #ccc; font-size: 1.2rem; }
+        tr[draggable="true"] { cursor: grab; }
+        tr.drag-over { border-top: 2px solid #333; }
 
         /* Modal */
         .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 100; display: none; align-items: center; justify-content: center; }
@@ -93,6 +95,7 @@
             <h1>後台管理</h1>
             <div class="topbar-actions">
                 <button class="btn btn-outline" id="btn-settings">設定</button>
+                <button class="btn btn-outline" id="btn-fallback">備援域名</button>
                 <button class="btn btn-primary" id="btn-add-work">新增作品</button>
                 <button class="btn btn-outline" id="btn-logout">登出</button>
             </div>
@@ -108,6 +111,33 @@
                             <input type="text" id="unlock-password-input" placeholder="輸入新密碼">
                         </div>
                         <button class="btn btn-primary" id="btn-save-password">儲存</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Fallback Domains (hidden by default) -->
+            <div id="fallback-section" style="display:none;">
+                <div class="settings-panel">
+                    <h3>備援域名管理</h3>
+                    <div class="settings-row" style="margin-bottom:16px;">
+                        <div class="form-group">
+                            <input type="text" id="fallback-domain-input" placeholder="example.com">
+                        </div>
+                        <button class="btn btn-primary" id="btn-add-fallback">新增</button>
+                    </div>
+                    <table class="works-table" id="fallback-table">
+                        <thead>
+                            <tr>
+                                <th>域名</th>
+                                <th style="width:100px;">分配數</th>
+                                <th style="width:80px;">狀態</th>
+                                <th style="width:140px;">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="fallback-tbody"></tbody>
+                    </table>
+                    <div id="fallback-empty" class="empty-state" style="display:none;padding:20px;">
+                        <p>尚未設定備援域名</p>
                     </div>
                 </div>
             </div>
@@ -183,6 +213,6 @@
         </div>
     </div>
 
-    <script src="/static/js/admin.js?v=5"></script>
+    <script src="/static/js/admin.js?v=6"></script>
 </body>
 </html>
