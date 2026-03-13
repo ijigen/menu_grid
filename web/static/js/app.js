@@ -363,6 +363,37 @@ async function startPriorityLoading(viewportCards, offViewportCards) {
 
     // Phase 4: Off-viewport thumbs
     await loadPhase(offViewportCards, loadCardThumb, 2);
+
+    // Phase 5: Preload all full-size images in background
+    preloadFullImages();
+}
+
+// Preload full-size encrypted images for all works, so expanding is instant.
+async function preloadFullImages() {
+    if (!state.cryptoKey || !state.works) return;
+    const filenames = [];
+    for (const work of state.works) {
+        if (work.images) {
+            for (const img of work.images) {
+                if (!state.blobCache[`full:${img.filename}`]) {
+                    filenames.push(img.filename);
+                }
+            }
+        }
+    }
+    if (filenames.length === 0) return;
+
+    const queue = [...filenames];
+    async function worker() {
+        while (queue.length > 0) {
+            const fn = queue.shift();
+            try { await loadEncryptedImage(fn, 'full'); } catch {}
+        }
+    }
+    // Low concurrency to avoid competing with user interactions
+    const workers = [];
+    for (let i = 0; i < Math.min(2, filenames.length); i++) workers.push(worker());
+    await Promise.all(workers);
 }
 
 async function loadPhase(cards, loadFn, concurrency) {
