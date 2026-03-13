@@ -1,4 +1,4 @@
-const CACHE_STATIC = 'static-v1';
+const CACHE_STATIC = 'static-v2';
 const CACHE_API = 'api-v1';
 const CACHE_IMAGES = 'images-v1';
 
@@ -48,7 +48,10 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
-    // API data (works list, verify-password, fallback): network-first
+    // verify-password: never cache (password may change; offline uses local verification)
+    if (url.pathname === '/api/verify-password') return;
+
+    // API data (works list, fallback): network-first
     if (url.pathname.startsWith('/api/')) {
         event.respondWith(networkFirst(event.request, CACHE_API));
         return;

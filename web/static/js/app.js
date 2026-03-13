@@ -171,13 +171,62 @@ async function onPasswordSubmit(e) {
             state.cryptoKey = await deriveKey(password, data.salt, data.iterations);
             state.passwordVerified = true;
             dom.passwordError.style.display = 'none';
+            // Cache encryption params for offline use
+            localStorage.setItem('enc_salt', data.salt);
+            localStorage.setItem('enc_iterations', String(data.iterations));
             updateGateState();
         } else {
+            dom.passwordError.textContent = '密碼錯誤';
             dom.passwordError.style.display = 'block';
         }
     } catch {
-        dom.passwordError.textContent = '連線錯誤，請稍後再試。';
-        dom.passwordError.style.display = 'block';
+        // Network failed — try offline verification
+        const offlineOk = await offlineVerify(password);
+        if (offlineOk) {
+            state.passwordVerified = true;
+            dom.passwordError.style.display = 'none';
+            updateGateState();
+        } else {
+            dom.passwordError.textContent = '離線狀態，且無法驗證密碼。';
+            dom.passwordError.style.display = 'block';
+        }
+    }
+}
+
+// Offline password verification:
+// Derive key from password + cached salt, then try decrypting a cached encrypted image.
+// If decryption succeeds, the password is correct.
+async function offlineVerify(password) {
+    const salt = localStorage.getItem('enc_salt');
+    const iterations = localStorage.getItem('enc_iterations');
+    if (!salt || !iterations) return false;
+
+    try {
+        const key = await deriveKey(password, salt, parseInt(iterations));
+
+        // Find a cached encrypted image to test against
+        const cache = await caches.open('images-v1');
+        const keys = await cache.keys();
+        const encReq = keys.find(r => {
+            const u = new URL(r.url);
+            return u.pathname.startsWith('/api/images/thumb/') || u.pathname.startsWith('/api/images/full/');
+        });
+        if (!encReq) return false;
+
+        const res = await cache.match(encReq);
+        if (!res) return false;
+
+        const buf = await res.arrayBuffer();
+        const data = new Uint8Array(buf);
+        const iv = data.slice(0, 12);
+        const ciphertext = data.slice(12);
+
+        // If decrypt succeeds, password is correct
+        await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, ciphertext);
+        state.cryptoKey = key;
+        return true;
+    } catch {
+        return false;
     }
 }
 

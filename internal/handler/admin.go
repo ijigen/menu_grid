@@ -273,6 +273,37 @@ func (h *AdminHandler) SetCover(w http.ResponseWriter, r *http.Request) {
 	jsonResponse(w, map[string]string{"status": "ok"})
 }
 
+// RegenerateThumbnails handles POST /api/admin/regenerate-thumbnails
+// Re-creates all thumb and preview images from the full-size originals.
+func (h *AdminHandler) RegenerateThumbnails(w http.ResponseWriter, r *http.Request) {
+	rows, err := h.DB.Query("SELECT DISTINCT filename FROM work_images")
+	if err != nil {
+		jsonError(w, "database error", http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	var total, success, failed int
+	for rows.Next() {
+		var filename string
+		if err := rows.Scan(&filename); err != nil {
+			continue
+		}
+		total++
+		if err := h.Storage.RegenerateVariants(filename); err != nil {
+			failed++
+		} else {
+			success++
+		}
+	}
+
+	jsonResponse(w, map[string]int{
+		"total":   total,
+		"success": success,
+		"failed":  failed,
+	})
+}
+
 // GetSettings handles GET /api/admin/settings
 func (h *AdminHandler) GetSettings(w http.ResponseWriter, r *http.Request) {
 	rows, err := h.DB.Query("SELECT key, value, updated_at FROM site_settings")

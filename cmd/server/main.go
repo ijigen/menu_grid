@@ -93,6 +93,7 @@ func main() {
 			r.Put("/images/{id}/set-cover", adminHandler.SetCover)
 			r.Get("/settings", adminHandler.GetSettings)
 			r.Put("/settings", adminHandler.UpdateSettings)
+			r.Post("/regenerate-thumbnails", adminHandler.RegenerateThumbnails)
 			// Plaintext image access for admin panel
 			r.Get("/images/thumb/{filename}", adminHandler.ServeThumbPlain)
 			r.Get("/images/full/{filename}", adminHandler.ServeFullPlain)

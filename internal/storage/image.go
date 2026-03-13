@@ -105,6 +105,33 @@ func (s *ImageStorage) ReadFile(imageType, filename string) ([]byte, error) {
 	return os.ReadFile(path)
 }
 
+// RegenerateVariants re-creates thumb and preview from the full image.
+func (s *ImageStorage) RegenerateVariants(filename string) error {
+	fullPath := filepath.Join(s.BaseDir, "full", filename)
+	f, err := os.Open(fullPath)
+	if err != nil {
+		return fmt.Errorf("failed to open full image: %w", err)
+	}
+	defer f.Close()
+
+	img, _, err := image.Decode(f)
+	if err != nil {
+		return fmt.Errorf("failed to decode full image: %w", err)
+	}
+
+	thumb := imaging.Resize(img, ThumbMaxWidth, 0, imaging.Lanczos)
+	if err := saveWebP(filepath.Join(s.BaseDir, "thumb", filename), thumb, ThumbQuality); err != nil {
+		return fmt.Errorf("failed to save thumb: %w", err)
+	}
+
+	preview := imaging.Resize(img, PreviewMaxWidth, 0, imaging.Lanczos)
+	if err := saveWebP(filepath.Join(s.BaseDir, "preview", filename), preview, PreviewQuality); err != nil {
+		return fmt.Errorf("failed to save preview: %w", err)
+	}
+
+	return nil
+}
+
 func saveWebP(path string, img image.Image, quality int) error {
 	f, err := os.Create(path)
 	if err != nil {

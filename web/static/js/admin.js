@@ -73,6 +73,22 @@ document.getElementById('btn-fallback').addEventListener('click', () => {
     if (fallbackVisible) loadFallbackDomains();
 });
 
+document.getElementById('btn-regen-thumbs').addEventListener('click', async () => {
+    if (!confirm('確定要重新生成所有縮圖與預覽圖？這可能需要一些時間。')) return;
+    const btn = document.getElementById('btn-regen-thumbs');
+    btn.disabled = true;
+    btn.textContent = '生成中...';
+    try {
+        const result = await api('POST', '/api/admin/regenerate-thumbnails');
+        alert(`完成！共 ${result.total} 張，成功 ${result.success} 張，失敗 ${result.failed} 張`);
+    } catch {
+        alert('重新生成失敗');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = '重新生成縮圖';
+    }
+});
+
 document.getElementById('btn-add-fallback').addEventListener('click', async () => {
     const input = document.getElementById('fallback-domain-input');
     const domain = input.value.trim();
