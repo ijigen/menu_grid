@@ -66,18 +66,39 @@ async function decryptImage(encryptedBuffer) {
 }
 
 // Fetch encrypted image, decrypt, return blob URL. Caches results.
+// If decryption fails (e.g. password/salt changed), retry bypassing cache.
 async function loadEncryptedImage(filename, type) {
     const cacheKey = `${type}:${filename}`;
     if (state.blobCache[cacheKey]) return state.blobCache[cacheKey];
 
     const url = type === 'thumb' ? thumbUrl(filename) : fullUrl(filename);
-    const res = await fetch(url);
+
+    // First try: normal fetch (may hit SW/browser cache)
+    let res = await fetch(url);
     if (!res.ok) throw new Error('fetch failed');
 
-    const blob = await decryptImage(await res.arrayBuffer());
-    const blobUrl = URL.createObjectURL(blob);
-    state.blobCache[cacheKey] = blobUrl;
-    return blobUrl;
+    let buf = await res.arrayBuffer();
+    try {
+        const blob = await decryptImage(buf);
+        const blobUrl = URL.createObjectURL(blob);
+        state.blobCache[cacheKey] = blobUrl;
+        return blobUrl;
+    } catch {
+        // Decryption failed — cached data uses old key.
+        // Purge SW cache for this URL, then re-fetch with cache-bust param to bypass SW.
+        if ('caches' in window) {
+            const cache = await caches.open('images-v1');
+            await cache.delete(url);
+        }
+        const bustUrl = url + (url.includes('?') ? '&' : '?') + '_cb=' + Date.now();
+        res = await fetch(bustUrl);
+        if (!res.ok) throw new Error('fetch failed');
+        buf = await res.arrayBuffer();
+        const blob = await decryptImage(buf);
+        const blobUrl = URL.createObjectURL(blob);
+        state.blobCache[cacheKey] = blobUrl;
+        return blobUrl;
+    }
 }
 
 // ===== Init =====
@@ -171,6 +192,14 @@ async function onPasswordSubmit(e) {
             state.cryptoKey = await deriveKey(password, data.salt, data.iterations);
             state.passwordVerified = true;
             dom.passwordError.style.display = 'none';
+            // If salt changed, purge old encrypted image caches
+            const oldSalt = localStorage.getItem('enc_salt');
+            if (oldSalt && oldSalt !== data.salt) {
+                state.blobCache = {};
+                if ('caches' in window) {
+                    await caches.delete('images-v1');
+                }
+            }
             // Cache encryption params for offline use
             localStorage.setItem('enc_salt', data.salt);
             localStorage.setItem('enc_iterations', String(data.iterations));
