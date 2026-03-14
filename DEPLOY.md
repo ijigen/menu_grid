@@ -255,3 +255,5 @@ psql -U menu_grid -d menu_grid -h localhost
 | 圖片上傳失敗 | 確認 `uploads/` 目錄權限，`ls -la /opt/menu_grid/uploads/` |
 | HTTPS 憑證失敗 | 確認域名 DNS 已生效，`journalctl -u caddy -n 50` |
 | 502 Bad Gateway | 確認 menu-grid 服務是否在運行，port 8080 是否正確 |
+
+---
