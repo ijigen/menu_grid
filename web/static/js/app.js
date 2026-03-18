@@ -1,6 +1,6 @@
 // ===== State =====
 const state = {
-    ageVerified: localStorage.getItem('age_verified') === 'true',
+    ageVerified: true,
     passwordVerified: false,
     works: [],
     favorites: JSON.parse(localStorage.getItem('favorites') || '[]'),
@@ -823,6 +823,40 @@ async function registerServiceWorker() {
         }
     } catch {}
 }
+
+// ===== PWA Install Prompt =====
+let deferredInstallPrompt = null;
+
+window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredInstallPrompt = e;
+    showInstallButton();
+});
+
+function showInstallButton() {
+    // Only show in gallery view (after password verified)
+    if (document.getElementById('pwa-install-btn')) return;
+    const btn = document.createElement('button');
+    btn.id = 'pwa-install-btn';
+    btn.className = 'pwa-install-btn';
+    btn.textContent = '安裝 App';
+    btn.addEventListener('click', async () => {
+        if (!deferredInstallPrompt) return;
+        deferredInstallPrompt.prompt();
+        const result = await deferredInstallPrompt.userChoice;
+        if (result.outcome === 'accepted') {
+            btn.remove();
+        }
+        deferredInstallPrompt = null;
+    });
+    document.body.appendChild(btn);
+}
+
+window.addEventListener('appinstalled', () => {
+    const btn = document.getElementById('pwa-install-btn');
+    if (btn) btn.remove();
+    deferredInstallPrompt = null;
+});
 
 // ===== Start =====
 updateFavoritesCount();

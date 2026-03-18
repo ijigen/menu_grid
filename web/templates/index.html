@@ -4,11 +4,16 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>作品目錄</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=4">
+    <link rel="manifest" href="/static/manifest.json">
+    <meta name="theme-color" content="#1a1a2e">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
+    <link rel="stylesheet" href="/static/css/style.css?v=5">
 </head>
 <body>
-    <!-- Phase 0: 成年驗證 Gate -->
-    <div id="age-gate" class="gate">
+    <!-- 成年驗證 Gate（已停用） -->
+    <div id="age-gate" class="gate" style="display:none;">
         <div class="gate-card">
             <h1>年齡驗證</h1>
             <p>本網站包含限制級內容，請確認您已年滿 18 歲。</p>
@@ -59,6 +64,6 @@
         <div id="favorites-overlay" class="favorites-overlay"></div>
     </div>
 
-    <script src="/static/js/app.js?v=6"></script>
+    <script src="/static/js/app.js?v=7"></script>
 </body>
 </html>

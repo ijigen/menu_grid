@@ -485,6 +485,24 @@ body {
     transform: scale(0.3);
 }
 
+/* PWA Install Button */
+.pwa-install-btn {
+    position: fixed;
+    bottom: 24px;
+    left: 24px;
+    padding: 10px 20px;
+    background: #333;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.3);
+    z-index: 1000;
+    transition: opacity 0.3s;
+}
+.pwa-install-btn:hover { background: #555; }
+
 /* Placeholder image */
 .placeholder-img {
     width: 100%;
